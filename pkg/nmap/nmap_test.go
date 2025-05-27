@@ -10,30 +10,43 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/rs/zerolog/log"
 )
 
 var (
 	dbPath   = flag.String("d", "../../internal/db/test.sqlite", "Path to sqlite database")
 	xmlPath  = flag.String("x", "./test.xml", "Path to nmap xml test file")
 	nmapArgs = flag.String("n", "-sS localhost", "Nmap custom arguments")
+	xmlFile  *os.File
+	dbHandle *sql.DB
 )
 
+func TestMain(m *testing.M) {
+	log.Info().Msgf("XML path: %v", *xmlPath)
+	log.Info().Msgf("DB path: %v", *dbPath)
+
+	var err error
+	xmlFile, err = os.Open(*xmlPath)
+	if err != nil {
+		log.Error().Err(err).Msg("Error opening xml file")
+		os.Exit(1)
+	}
+
+	defer xmlFile.Close()
+
+	dbHandle, err = sql.Open("sqlite3", *dbPath)
+	if err != nil {
+		log.Error().Err(err).Msg("Error opening database")
+		os.Exit(1)
+	}
+	defer dbHandle.Close()
+
+	os.Exit(m.Run())
+}
+
 func TestXMLParseData(t *testing.T) {
-	f, err := os.Open(*xmlPath)
-	if err != nil {
-		t.Errorf("Error opening xml test file: %s", err)
-	}
-
-	defer f.Close()
-
-	db, err := sql.Open("sqlite3", *dbPath)
-	if err != nil {
-		t.Errorf("Error opening database: %s", err)
-	}
-	defer db.Close()
-
 	t.Run("Test XML parse normally", func(t *testing.T) {
-		err = ParseData(context.Background(), f, db)
+		err := ParseData(context.Background(), xmlFile, dbHandle)
 		if err != nil {
 			t.Errorf("Error parsing data: %s", err)
 		}
@@ -43,7 +56,7 @@ func TestXMLParseData(t *testing.T) {
 
 	t.Run("Test XML parse cancelling early", func(t *testing.T) {
 		cancel()
-		err = ParseData(ctx, f, db)
+		err := ParseData(ctx, xmlFile, dbHandle)
 		if err != context.Canceled {
 			t.Errorf("Error cancelling function: %s", err)
 		}
@@ -61,19 +74,11 @@ func TestNmapScanParseData(t *testing.T) {
 		t.Errorf("Error getting stdout pipe for nmap command: %s", err)
 	}
 
-	defer stdout.Close()
-
-	db, err := sql.Open("sqlite3", *dbPath)
-	if err != nil {
-		t.Errorf("Error opening database: %s", err)
-	}
-	defer db.Close()
-
 	if err := cmd.Start(); err != nil {
 		t.Errorf("Error starting nmap: %s", err)
 	}
 
-	err = ParseData(context.Background(), stdout, db)
+	err = ParseData(context.Background(), stdout, dbHandle)
 	if err != nil {
 		t.Errorf("Error parsing data: %s", err)
 	}
@@ -84,26 +89,13 @@ func TestNmapScanParseData(t *testing.T) {
 }
 
 func BenchmarkXMLParseData(b *testing.B) {
-	f, err := os.Open(*xmlPath)
-	if err != nil {
-		b.Errorf("Error opening xml test file: %s", err)
-	}
-
-	defer f.Close()
-
-	db, err := sql.Open("sqlite3", *dbPath)
-	if err != nil {
-		b.Errorf("Error opening database: %s", err)
-	}
-	defer db.Close()
-
 	ctx := context.Background()
 
 	for b.Loop() {
-		err = ParseData(ctx, f, db)
+		err := ParseData(ctx, xmlFile, dbHandle)
 		if err != nil {
 			b.Errorf("Error parsing data: %s", err)
 		}
-		f.Seek(0, 0)
+		xmlFile.Seek(0, 0)
 	}
 }
