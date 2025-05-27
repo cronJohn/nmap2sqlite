@@ -14,16 +14,19 @@ import (
 )
 
 var (
-	dbPath   = flag.String("d", "../../internal/db/test.sqlite", "Path to sqlite database")
-	xmlPath  = flag.String("x", "./test.xml", "Path to nmap xml test file")
-	nmapArgs = flag.String("n", "-sS localhost", "Nmap custom arguments")
+	dbPath   = flag.String("db", "../../internal/db/test.sqlite", "Path to sqlite database")
+	xmlPath  = flag.String("xml", "./test.xml", "Path to nmap xml test file")
+	nmapArgs = flag.String("nmap", "-sS localhost", "Nmap custom arguments")
 	xmlFile  *os.File
 	dbHandle *sql.DB
 )
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+
 	log.Info().Msgf("XML path: %v", *xmlPath)
 	log.Info().Msgf("DB path: %v", *dbPath)
+	log.Info().Msgf("Nmap args: %v", *nmapArgs)
 
 	var err error
 	xmlFile, err = os.Open(*xmlPath)
