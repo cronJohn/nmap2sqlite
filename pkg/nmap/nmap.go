@@ -80,8 +80,6 @@ func ParseData(ctx context.Context, data io.Reader, dbHandle *sql.DB) error {
 					}
 
 					scanID = lastReturnId
-
-					continue
 				case "scaninfo":
 					scanInfo := ScanInfo{}
 					if err := decoder.DecodeElement(&scanInfo, &startElem); err != nil {
